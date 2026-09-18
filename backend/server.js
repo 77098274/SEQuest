@@ -21,6 +21,82 @@ const app = express();
 
 app.use(cors());
 app.use(express.json());
+app.post("/api/register", (req, res) => {
+    const { name, email, password } = req.body;
+
+    if (!name || !email || !password) {
+        return res.status(400).json({
+            error: "Name, email and password are required"
+        });
+    }
+
+    const sql = `
+        INSERT INTO users (name, email, password, role)
+        VALUES (?, ?, ?, 'USER')
+    `;
+
+    db.query(
+        sql,
+        [name, email, password],
+        (err, result) => {
+            if (err) {
+                if (err.code === "ER_DUP_ENTRY") {
+                    return res.status(409).json({
+                        error: "Email already registered"
+                    });
+                }
+
+                return res.status(500).json({
+                    error: "Registration failed"
+                });
+            }
+
+            res.status(201).json({
+                message: "Registration successful!",
+                user_id: result.insertId
+            });
+        }
+    );
+});
+
+app.post("/api/login", (req, res) => {
+    const { email, password } = req.body;
+
+    if (!email || !password) {
+        return res.status(400).json({
+            error: "Email and password are required"
+        });
+    }
+
+    const sql = `
+        SELECT id, name, email, role
+        FROM users
+        WHERE email = ? AND password = ?
+    `;
+
+    db.query(
+        sql,
+        [email, password],
+        (err, results) => {
+            if (err) {
+                return res.status(500).json({
+                    error: "Login failed"
+                });
+            }
+
+            if (results.length === 0) {
+                return res.status(401).json({
+                    error: "Invalid email or password"
+                });
+            }
+
+            res.json({
+                message: "Login successful!",
+                user: results[0]
+            });
+        }
+    );
+});
 
 app.get("/", (req, res) => {
     res.json({
