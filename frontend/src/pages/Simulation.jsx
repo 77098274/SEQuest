@@ -1,6 +1,85 @@
+
 import MetricCard from "../components/MetricCard";
 import DecisionCard from "../components/DecisionCard";
 import { stages } from "../data/scenarios";
+import "./Simulation.css";
+import PdfReportButton from "../components/PdfReportButton";
+
+function getScore(value) {
+  const score = Number(value);
+  return Number.isFinite(score)
+    ? Math.max(0, Math.min(100, score))
+    : 0;
+}
+
+function getPerformance(score) {
+  if (score >= 85) {
+    return {
+      rating: "Excellent",
+      icon: "🏆",
+      description:
+        "Outstanding project management! Your decisions helped maintain strong project performance.",
+    };
+  }
+
+  if (score >= 70) {
+    return {
+      rating: "Good",
+      icon: "🎉",
+      description:
+        "Good work! Your project performed well, with a few areas that could be improved.",
+    };
+  }
+
+  if (score >= 50) {
+    return {
+      rating: "Average",
+      icon: "📈",
+      description:
+        "You made some effective decisions, but there are opportunities to improve project outcomes.",
+    };
+  }
+
+  return {
+    rating: "Needs Improvement",
+    icon: "💡",
+    description:
+      "Every simulation is a learning opportunity. Review your decisions and focus on improving your weakest project areas.",
+  };
+}
+
+function getFeedback(metrics) {
+  const weakest = [...metrics].sort(
+    (a, b) => a.score - b.score
+  )[0];
+
+  const feedback = {
+    "Budget Performance":
+      "Review spending regularly, estimate costs carefully, and keep a reserve for unexpected expenses.",
+
+    "Schedule Performance":
+      "Improve task planning, track deadlines, and identify delays before they affect the entire project.",
+
+    "Quality Score":
+      "Strengthen code reviews, testing, and quality checks throughout development.",
+
+    "Risk Management":
+      "Identify risks early, assess their impact, and prepare mitigation plans before problems occur.",
+
+    "Customer Satisfaction":
+      "Communicate regularly with customers and validate requirements before implementing changes.",
+
+    "Technical Debt Score":
+      "Review the technical debt calculation used by your simulation and prioritize maintainability improvements.",
+  };
+
+  return {
+    weakest,
+    suggestion:
+      feedback[weakest.label] ||
+      "Review your project decisions and identify areas for improvement.",
+  };
+}
 
 function Simulation({
   simulation,
@@ -10,9 +89,61 @@ function Simulation({
   aiAnalysis,
   user,
   onDecision,
-  onRestart
+  onRestart,
 }) {
   if (result) {
+    const metrics = [
+      {
+        label: "Budget Performance",
+        value: result.budget_performance,
+        icon: "💰",
+      },
+      {
+        label: "Schedule Performance",
+        value: result.schedule_performance,
+        icon: "⏳",
+      },
+      {
+        label: "Quality Score",
+        value: result.quality_score,
+        icon: "⭐",
+      },
+      {
+        label: "Risk Management",
+        value: result.risk_management,
+        icon: "⚠️",
+      },
+      {
+        label: "Customer Satisfaction",
+        value: result.customer_satisfaction,
+        icon: "😊",
+      },
+      {
+        label: "Technical Debt Score",
+        value: result.technical_debt_score,
+        icon: "🔧",
+      },
+    ].map((metric) => ({
+      ...metric,
+      score: getScore(metric.value),
+    }));
+
+    const overallScore = Math.round(
+      metrics.reduce(
+        (total, metric) => total + metric.score,
+        0
+      ) / metrics.length
+    );
+
+    const performance = getPerformance(overallScore);
+    const feedback = getFeedback(metrics);
+
+    const recommendations = Array.isArray(
+      aiAnalysis?.recommendations
+    )
+      ? aiAnalysis.recommendations
+      : [];
+
     return (
       <>
         <section className="results-hero">
@@ -27,48 +158,92 @@ function Simulation({
           <h2>Project Results</h2>
 
           <p>
-            Great work, {user.name}! Here's how
-            your project performed.
+            Great work{user?.name ? `, ${user.name}` : ""}!
+            Here is how your project performed.
           </p>
         </section>
 
-        <div className="results-grid">
-          <Result
-            label="Budget Performance"
-            value={result.budget_performance}
-            icon="💰"
-          />
+        <section className="overall-score-card">
+          <div className="overall-score-icon">
+            {performance.icon}
+          </div>
 
-          <Result
-            label="Schedule Performance"
-            value={result.schedule_performance}
-            icon="⏳"
-          />
+          <p className="eyebrow">
+            OVERALL PROJECT SCORE
+          </p>
 
-          <Result
-            label="Quality Score"
-            value={result.quality_score}
-            icon="⭐"
-          />
+          <div className="overall-score-number">
+            {overallScore}
+            <span>/100</span>
+          </div>
 
-          <Result
-            label="Risk Management"
-            value={result.risk_management}
-            icon="⚠️"
-          />
+          <div className="overall-score-progress">
+            <div
+              style={{
+                width: `${overallScore}%`,
+              }}
+            />
+          </div>
 
-          <Result
-            label="Customer Satisfaction"
-            value={result.customer_satisfaction}
-            icon="😊"
-          />
+          <h2>{performance.rating}</h2>
 
-          <Result
-            label="Technical Debt Score"
-            value={result.technical_debt_score}
-            icon="🔧"
-          />
-        </div>
+          <p>{performance.description}</p>
+        </section>
+
+        <section className="results-section">
+          <div className="results-section-heading">
+            <p className="eyebrow">
+              PERFORMANCE BREAKDOWN
+            </p>
+
+            <h2>Your Project Metrics</h2>
+
+            <p>
+              Review how your decisions affected each
+              project performance area.
+            </p>
+          </div>
+
+          <div className="results-grid">
+            {metrics.map((metric) => (
+              <Result
+                key={metric.label}
+                label={metric.label}
+                value={metric.score}
+                icon={metric.icon}
+              />
+            ))}
+          </div>
+        </section>
+
+        <section className="feedback-card">
+          <p className="eyebrow">
+            PERSONALIZED FEEDBACK
+          </p>
+
+          <h2>
+            {overallScore >= 70
+              ? "Keep up the good work!"
+              : "Here is where to focus next"}
+          </h2>
+
+          <p>
+            Your strongest next step is to improve{" "}
+            <strong>{feedback.weakest.label}</strong>,
+            currently scored at{" "}
+            <strong>{feedback.weakest.score}/100</strong>.
+          </p>
+
+          <div className="improvement-tip">
+            <span>💡</span>
+
+            <div>
+              <strong>Suggested improvement</strong>
+
+              <p>{feedback.suggestion}</p>
+            </div>
+          </div>
+        </section>
 
         {aiAnalysis && (
           <section className="ai-card">
@@ -82,9 +257,7 @@ function Simulation({
                   AI ANALYSIS
                 </p>
 
-                <h2>
-                  Project Risk Assessment
-                </h2>
+                <h2>Project Risk Assessment</h2>
               </div>
             </div>
 
@@ -92,44 +265,69 @@ function Simulation({
               <span>Risk Level</span>
 
               <strong>
-                {aiAnalysis.risk_level}
+                {aiAnalysis.risk_level ?? "Not available"}
               </strong>
 
               <small>
                 Predicted Risk:{" "}
-                {aiAnalysis.predicted_risk}
+                {aiAnalysis.predicted_risk ?? "Not available"}
               </small>
             </div>
 
-            <h3>
-              AI Recommendations
-            </h3>
+            <h3>AI Recommendations</h3>
 
-            <div className="recommendations">
-              {aiAnalysis.recommendations.map(
-                (recommendation, index) => (
-                  <div
-                    className="recommendation"
-                    key={index}
-                  >
-                    <span>✓</span>
+            {recommendations.length > 0 ? (
+              <div className="recommendations">
+                {recommendations.map(
+                  (recommendation, index) => (
+                    <div
+                      className="recommendation"
+                      key={index}
+                    >
+                      <span>✓</span>
 
-                    <p>
-                      {recommendation}
-                    </p>
-                  </div>
-                )
-              )}
-            </div>
+                      <p>{recommendation}</p>
+                    </div>
+                  )
+                )}
+              </div>
+            ) : (
+              <p>
+                No AI recommendations are available for
+                this simulation.
+              </p>
+            )}
           </section>
         )}
 
-        <button
-          className="primary-button restart-button"
-          onClick={onRestart}
+        <div
+          style={{
+            display: "flex",
+            justifyContent: "center",
+            gap: "12px",
+            flexWrap: "wrap",
+            marginTop: "24px",
+          }}
         >
-          ← Back to Scenarios
-        </button>
+          <PdfReportButton
+            user={user}
+            sessionId={sessionId}
+            result={result}
+            overallScore={overallScore}
+            performance={performance}
+            metrics={metrics}
+            feedback={feedback}
+            aiAnalysis={aiAnalysis}
+            recommendations={recommendations}
+          />
+
+          <button
+            className="primary-button restart-button"
+            onClick={onRestart}
+          >
+            ← Back to Scenarios
+          </button>
+        </div>
       </>
     );
   }
@@ -253,6 +451,8 @@ function Simulation({
 }
 
 function Result({ label, value, icon }) {
+  const score = getScore(value);
+
   return (
     <div className="result-card">
       <span className="result-icon">
@@ -261,15 +461,12 @@ function Result({ label, value, icon }) {
 
       <span>{label}</span>
 
-      <strong>{value}/100</strong>
+      <strong>{score}/100</strong>
 
       <div className="progress">
         <div
           style={{
-            width: `${Math.max(
-              0,
-              Math.min(100, value)
-            )}%`
+            width: `${score}%`,
           }}
         />
       </div>
